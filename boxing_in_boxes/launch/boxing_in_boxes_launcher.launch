@@ -1,0 +1,11 @@
+<launch>
+
+  <!-- Start the node for the box service server-->
+  <node pkg="boxing_in_boxes" type="service_server_box.py" name="service_server_box" output="screen">
+  </node>
+
+  <!-- Start the node for the box service client-->
+  <node pkg="boxing_in_boxes" type="service_client_box_loop.py" name="service_client_box_loop" output="screen">
+  </node>
+
+</launch>
