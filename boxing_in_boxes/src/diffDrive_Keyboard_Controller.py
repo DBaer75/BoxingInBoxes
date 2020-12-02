@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 
+#provides functionality to drive the robot around by using the keyboard
 import rospy
 from gazebo_msgs.srv import ApplyJointEffort
 from gazebo_msgs.srv import GetJointProperties
 import curses
 import time as t
 
-speedLimit = 5
-effortStrength = 1
 
-#set up joint rospy
+speedLimit = 5 #maximum speed of the robot
+effortStrength = 1 #range of [0,1]. Sets the strength of torque to wheels 
+
+#set up joint ros
 msg_topic = '/gazebo/apply_joint_effort'
 joint_left = 'DD_robot::left_wheel_hinge'
 joint_right = 'DD_robot::right_wheel_hinge'
@@ -18,6 +20,8 @@ pub_feedback = rospy.ServiceProxy(msg_topic_feedback, GetJointProperties)
 rospy.init_node('DD_ctrl', anonymous=True)
 pub = rospy.ServiceProxy(msg_topic, ApplyJointEffort)
 
+
+#set up time values for call to joint effort
 start_time = rospy.Time(0,0)
 f = float(20)
 T = 1/f
@@ -26,7 +30,11 @@ end_time = rospy.Time(0,Tnano)
 duration = end_time-start_time
 rate = rospy.Rate(f)
 
+
 def decideEffort(wheelRate, wheelStatus):
+    #decides how much effort to apply to the wheels
+    #the dumbest controller possible, implementing a PI or PID controller would be way better
+
     #fixed acceleration up to requested speed
     if wheelRate<(speedLimit*wheelStatus):
         wheelEffort = effortStrength
@@ -35,17 +43,19 @@ def decideEffort(wheelRate, wheelStatus):
         wheelEffort = -effortStrength
     return wheelEffort
 
+
+#curses needs to be in a try, finally so that it can close properly and not break the terminal
 try:
     #set up curses
-    stdscr = curses.initscr() 
-    curses.cbreak()
-    curses.noecho()
+    stdscr = curses.initscr() #sets up the standard screen for curses
+    curses.cbreak() #inputs will not wait for newline
+    curses.noecho() #inputs will not print to screen
     curses.halfdelay(6) #sets to trigger exception after no input for (TenthsSeconds)
 
     #screen to show current command
     statusScr = curses.newwin(10,35,2,45)
 
-    #create screan for header
+    #create screen for header
     statusHeader = curses.newwin(1,35,0,45)
     statusHeader.clear()
     statusHeader.addstr(0,5,'CURRENT COMMAND')
@@ -65,20 +75,20 @@ try:
 
 
     #main loop
-    prevKey  = -1
+    prevKey  = -1 #default to no new input
     wheelL = 0
     wheelR = 0
-    while True:
+    while True: #loop to look for input from keyboard
         try:
-            currKey = statusScr.getch()
-        except KeyboardInterrupt:
+            currKey = statusScr.getch() #returns -1 and creates exception if no input
+        except KeyboardInterrupt: #lets ctrl-c work
             break
-        except:
+        except: #clean up exception for no input
             currKey = -1  
         if (currKey == ord('q')):
                 break  # Exit the while loop
-        if (prevKey != currKey):
-            statusScr.clear()
+        if (prevKey != currKey): #check if key has been changed
+            statusScr.clear() #clear the screen 
             if (currKey == -1)|(currKey == 32): #spacebar or catch no input if exception
                 statusScr.addstr(1,10,'stop')
                 wheelL = 0
@@ -106,7 +116,7 @@ try:
             statusScr.refresh()
             prevKey = currKey    
 
-        #control
+        #control the robot
         valLeft = pub_feedback(joint_left)
         valRight = pub_feedback(joint_right)   
 
@@ -133,7 +143,7 @@ try:
 
                  
 finally:
-    #shut down curses
+    #shut down curses. Extremely important 
     curses.nocbreak()
     curses.echo()
     curses.endwin()
